@@ -88,7 +88,7 @@ export class EksStack extends cdk.Stack {
       ],
       // Get a list of all public subnetIds in the VPC and pick the first one
       subnetId: vpc.selectSubnets( { onePerAz: true, subnetType: SubnetType.PUBLIC}).subnetIds[0],
-      ownerArn: 'arn:aws:iam::294124263825:user/johnyi@amazon.com'
+      ownerArn: 'arn:aws:iam::657690568281:user/awsdemo001'
     });
     
     
