@@ -18,7 +18,8 @@ export class EksStack extends cdk.Stack {
     // const topic = new sns.Topic(this, 'EksTopic');
 
     // topic.addSubscription(new subs.SqsSubscription(queue));
-    
+
+
     const vpc = new Vpc(this, 'VPC', {
       maxAzs: 3,
       cidr: "10.10.0.0/16",
@@ -35,18 +36,21 @@ export class EksStack extends cdk.Stack {
         }
       ]
     });
-    
+
+
     const clusterAdmin = new iam.Role(this, 'AdminRole', {
-      assumedBy: new iam.AccountRootPrincipal(),
+      // assumedBy: new iam.AccountRootPrincipal(),
+      assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
       managedPolicies: [
         { managedPolicyArn: 'arn:aws:iam::aws:policy/AdministratorAccess' }
       ]
     });
     
+
     const instanceProfileClusterAdmin = new iam.CfnInstanceProfile(this, 'instanceProfileClusterAdmin', {
         instanceProfileName: 'instanceProfileClusterAdmin',
         roles: [
-          clusterAdmin.roleArn
+          clusterAdmin.roleName
         ]}
     )
     
@@ -55,7 +59,8 @@ export class EksStack extends cdk.Stack {
       description: 'Allow 443 access to eks masters',
       allowAllOutbound: true   // Can be set to false
     });
-    
+
+ 
     const cluster = new eks.Cluster(this, 'fsi405-eks', {
       defaultCapacity: 3,
       defaultCapacityInstance: new InstanceType('t3.medium'),
@@ -69,7 +74,8 @@ export class EksStack extends cdk.Stack {
       kubectlEnabled: true,
       securityGroup: eksControlPlaneSG
     });
-    
+
+
     const eksConsole = new cloud9.CfnEnvironmentEC2(this, 'eksConsole', {
       instanceType: 't2.small',
       description: 'eks management',
