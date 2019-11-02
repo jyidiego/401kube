@@ -13,22 +13,21 @@ phases:
   install:
     #If you use the Ubuntu standard image 2.0 or later, you must specify runtime-versions.
     #If you specify runtime-versions and use an image other than Ubuntu standard image 2.0, the build fails.
-    #runtime-versions:
-    #  python: 3.7
     runtime-versions:
       nodejs: 10
       # name: version
-    #commands:
-      # - command
-      # - command
-  #pre_build:
-    #commands:
-      # - command
-      # - command
-  build:
     commands:
       - npm install -g aws-cdk
       - npm install
+  pre_build:
+    commands:
+      - echo "Pre-build setup cdk bootstrap"
+      - cdk bootstrap
+      # - command
+  build:
+    commands:
+      - cdk deploy --require-approval never
+      # - command
       # - curl --silent --location "https://github.com/weaveworks/eksctl/releases/download/latest_release/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
       # - /tmp/eksctl create cluster --name fsi405 --version 1.14 --nodegroup-name standard-workers --node-type t3.medium --nodes 3 --nodes-min 1 --nodes-max 4 --node-ami auto --node-private-networking --region us-east-2
   #post_build:
