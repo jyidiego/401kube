@@ -26,4 +26,5 @@ mkdir -p $HOME/bin && cp ./aws-iam-authenticator $HOME/bin/aws-iam-authenticator
 echo "running aws-iam-authenticator help"
 aws-iam-authenticator help
 
-
+echo "sudo yum install jq -y"
+sudo yum install jq -y
