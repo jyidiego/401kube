@@ -62,6 +62,7 @@ export class EksStack extends cdk.Stack {
 
  
     const cluster = new eks.Cluster(this, 'fsi405-eks', {
+      clusterName: 'fsi405-eks',
       defaultCapacity: 3,
       defaultCapacityInstance: new InstanceType('t3.medium'),
       vpc: vpc,
