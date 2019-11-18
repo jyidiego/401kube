@@ -7,3 +7,4 @@ kubectl
 # CDK asset staging directory
 .cdk.staging
 cdk.out
+register_dns_cert.py
