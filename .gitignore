@@ -8,3 +8,5 @@ kubectl
 .cdk.staging
 cdk.out
 register_dns_cert.py
+401kube.zip
+deploy.sh
