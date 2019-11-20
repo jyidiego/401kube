@@ -1,6 +1,6 @@
 #!/bin/env bash
 
-route53fullaccess=arn:aws:iam::aws:policy/AmazonRoute53ResolverFullAccess
+route53fullaccess=arn:aws:iam::aws:policy/AmazonRoute53FullAccess
 rolename=$(aws iam list-roles --output text | grep EksStack-fsi405eksDefaultCapacityInstanceRole | awk -F: '{print $6}' | awk '{print $1}' | awk -F/ '{print $2}')
 
 echo "Route53FullAccess policy attachment to EKS Worker Node"
