@@ -14,4 +14,3 @@ aws iam attach-role-policy --role-name ${rolename} --policy-arn ${cloudwatchfull
 echo "Deploying fluentd to EKS"
 sed 's/{{cluster_name}}/fsi405-eks/;s/{{region_name}}/us-east-2/' ./fluentd/${fluentd} | kubectl apply -f -
 # kubectl logs -n amazon-cloudwatch $(kubectl get po -n amazon-cloudwatch | egrep -o "fluentd-cloudwatch[a-zA-Z0-9-]+") -f
-echo $cloudwatchlogsfull
