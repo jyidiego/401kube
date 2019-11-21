@@ -15,6 +15,7 @@ metadata:
 spec:
   rules:
     - http:
+      # host: 2048.<change me>.fsi405.jyidiego.net
         paths:
           - path: /*
             backend:
