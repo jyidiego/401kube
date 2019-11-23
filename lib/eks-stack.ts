@@ -6,6 +6,7 @@ import eks = require('@aws-cdk/aws-eks');
 import { Vpc, SubnetType, InstanceType, SecurityGroup } from '@aws-cdk/aws-ec2';
 import iam = require('@aws-cdk/aws-iam')
 import cloud9 = require('@aws-cdk/aws-cloud9')
+import waf = require('@aws-cdk/aws-wafregional')
 
 export class EksStack extends cdk.Stack {
   constructor(scope: cdk.App, id: string, props?: cdk.StackProps) {
@@ -92,7 +93,94 @@ export class EksStack extends cdk.Stack {
       ownerArn: 'arn:aws:iam::' + this.account + ':assumed-role/TeamRole/MasterKey'
     });
     
+    const jsmatchset = new waf.CfnByteMatchSet(this, 'jsmatchset', { 
+      name: 'jsmatchset',
+      byteMatchTuples: [ { 
+        fieldToMatch : { 
+          type: 'URI'
+        },
+        positionalConstraint : 'STARTS_WITH',
+        targetString : '/js',
+        textTransformation : 'NONE'
+      }]
+    });
     
+    const cssmatchset = new waf.CfnByteMatchSet(this, 'cssmatchset', { 
+      name: 'cssmatchset',
+      byteMatchTuples: [ { 
+        fieldToMatch : { 
+          type: 'URI'
+        },
+        positionalConstraint : 'STARTS_WITH',
+        targetString : '/style',
+        textTransformation : 'NONE'
+      }]
+    });
+    
+    const forwardslashonlymatchset = new waf.CfnByteMatchSet(this, 'forwardslashonlymatchset', { 
+      name: 'forwardslashonlymatchset',
+      byteMatchTuples: [ { 
+        fieldToMatch : { 
+          type: 'URI'
+        },
+        positionalConstraint : 'EXACTLY',
+        targetString : '/',
+        textTransformation : 'NONE'
+      }]
+    });
+    
+    const validjs = new waf.CfnRule(this, 'validjs', { 
+      name: 'validjs',
+      metricName: 'validjs',
+      predicates: [ 
+                    { dataId : jsmatchset.ref,
+                      negated: false,
+                      type: 'ByteMatch' }
+                  ]
+      
+    });
+    
+    const validstyle = new waf.CfnRule(this, 'validstyle', { 
+      name: 'validstyle',
+      metricName: 'validstyle',
+      predicates: [ 
+                    { dataId : cssmatchset.ref,
+                      negated: false,
+                      type: 'ByteMatch' }
+                  ]
+      
+    });
+
+    const validslash = new waf.CfnRule(this, 'validslash', { 
+      name: 'validslash',
+      metricName: 'validslash',
+      predicates: [ 
+                    { dataId : forwardslashonlymatchset.ref,
+                      negated: false,
+                      type: 'ByteMatch' }
+                  ]
+      
+    });
+    
+    const secure2048 = new waf.CfnWebACL(this, 'secure2048', { 
+      name: 'secure2048',
+      metricName: 'secure2048',
+      defaultAction: { type: 'BLOCK'},
+      rules: [
+        { action: { type : 'ALLOW' },
+          priority: 1,
+          ruleId: validjs.ref
+        },
+        { action: { type: 'ALLOW' },
+          priority: 2,
+          ruleId: validstyle.ref
+        },
+        { action: { type: 'ALLOW' },
+          priority: 3,
+          ruleId: validslash.ref
+        }
+      ]
+    })
     
   }
 }
