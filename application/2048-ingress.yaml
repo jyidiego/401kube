@@ -16,7 +16,7 @@ spec:
   rules:
     # - host: 2048.<change me>.fsi405.jyidiego.net
     #   http:
-    - http:
+    - http: # Delete this line if you are using host
         paths:
           #- path: /*
           #  backend:
