@@ -17,6 +17,10 @@ spec:
     - http:
       # host: 2048.<change me>.fsi405.jyidiego.net
         paths:
+          #- path: /*
+          #  backend:
+          #    serviceName: ssl-redirect
+          #    servicePort: use-annotation
           - path: /*
             backend:
               serviceName: "service-2048"
