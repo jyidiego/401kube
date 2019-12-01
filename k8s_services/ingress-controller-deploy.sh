@@ -28,5 +28,6 @@ echo "Deploy Ingress Controller"
 sed 's/# - --cluster-name=devCluster/- --cluster-name=fsi405-eks/' ./ingress_controller/alb-ingress-controller.yaml | kubectl apply -f -
 
 echo "Checking logs.....CTRL C when you see that it is working"
+sleep 5
 kubectl logs -n kube-system $(kubectl get po -n kube-system | egrep -o "alb-ingress[a-zA-Z0-9-]+") -f
 

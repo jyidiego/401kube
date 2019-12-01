@@ -11,4 +11,5 @@ dns_domain=$(aws route53 list-hosted-zones | egrep -o ".*builder[0-9]+.fsi405.jy
 sed 's@external-dns-test.my-org.com@'"$dns_domain"'@' external_dns/external-dns.yaml | kubectl apply -f -
 
 echo "Checking logs.....CTRL C when you see that it is working"
+sleep 5
 kubectl logs -n kube-system $(kubectl get po -n kube-system | egrep -o "external-dns[a-zA-Z0-9-]+") -f 
