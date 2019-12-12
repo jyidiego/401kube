@@ -1,0 +1,362 @@
+###################################################################################
+# Deploy infrasctructure via CLI
+###################################################################################
+
+Parameters:
+  UrlSource:
+    Description: 'URL of the zipfile; Generally a publicly available S3 object'
+    Type: String
+    Default: https://awsdemo001-input-test.s3.us-east-2.amazonaws.com/401kube.zip
+  SourceObjectKey:
+    Description: 'S3 source artifact'
+    Type: String
+    Default: 401kube.zip
+  #Region:
+  #  Description: 'AWS region to deploy codepipeline'
+  #  Type: String
+  #  Default: us-east-1
+  #S3CopyKey:
+  #  Description: S3 key for S3Copy zip
+  #  Type: String
+  #  Default: s3copy.zip
+    
+Resources:
+  ArtifactStoreBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      VersioningConfiguration:
+        Status: Enabled
+      AccessControl: BucketOwnerFullControl
+  CodePipelineArtifactStoreBucket:
+    Type: AWS::S3::Bucket
+  CodePipelineArtifactStoreBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CodePipelineArtifactStoreBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Sid: DenyUnEncryptedObjectUploads
+            Effect: Deny
+            Principal: '*'
+            Action: s3:PutObject
+            Resource: !Join [ '', [ !GetAtt CodePipelineArtifactStoreBucket.Arn, '/*' ] ]
+            Condition:
+              StringNotEquals: 
+                s3:x-amz-server-side-encryption: aws:kms
+          -
+            Sid: DenyInsecureConnections
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource: !Join [ '', [ !GetAtt CodePipelineArtifactStoreBucket.Arn, '/*' ] ]
+            Condition:
+              Bool:
+                aws:SecureTransport: false
+  CodePipelineServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      Policies:
+        -
+          PolicyName: AWS-CodePipeline-Service-3
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              -
+                Effect: Allow
+                Action:
+                  - codecommit:CancelUploadArchive
+                  - codecommit:GetBranch
+                  - codecommit:GetCommit
+                  - codecommit:GetUploadArchiveStatus
+                  - codecommit:UploadArchive
+                Resource: '*'
+              - 
+                Effect: Allow
+                Action:
+                  - codepipeline:*
+                Resource: '*'
+              -
+                Effect: Allow
+                Action:
+                  - codedeploy:CreateDeployment
+                  - codedeploy:GetApplicationRevision
+                  - codedeploy:GetDeployment
+                  - codedeploy:GetDeploymentConfig
+                  - codedeploy:RegisterApplicationRevision
+                Resource: '*'
+              -
+                Effect: Allow
+                Action:
+                  - codebuild:*
+                Resource: '*'
+              -
+                Effect: Allow
+                Action:
+                  - devicefarm:ListProjects
+                  - devicefarm:ListDevicePools
+                  - devicefarm:GetRun
+                  - devicefarm:GetUpload
+                  - devicefarm:CreateUpload
+                  - devicefarm:ScheduleRun
+                Resource: '*'
+              -
+                Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                  - lambda:ListFunctions
+                Resource: '*'
+              -
+                Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource: '*'
+              -
+                Effect: Allow
+                Action:
+                  - elasticbeanstalk:*
+                  - ec2:*
+                  - elasticloadbalancing:*
+                  - autoscaling:*
+                  - cloudwatch:*
+                  - s3:*
+                  - sns:*
+                  - cloudformation:*
+                  - rds:*
+                  - sqs:*
+                  - ecs:*
+                Resource: '*'
+  DeployerPipeline:
+    DependsOn: 
+    - DeployArtifact
+    Type: AWS::CodePipeline::Pipeline
+    Properties: 
+      Name: deploy-pipeline
+      RoleArn: 
+        !GetAtt CodePipelineServiceRole.Arn
+      Stages: 
+        - 
+          Name: Source
+          Actions: 
+            - 
+              Name: SourceAction
+              ActionTypeId: 
+                Category: Source
+                Owner: AWS
+                Version: 1
+                Provider: S3
+              OutputArtifacts: 
+                - Name: SourceOutput
+              Configuration: 
+                S3Bucket: !Ref ArtifactStoreBucket
+                S3ObjectKey: !Ref SourceObjectKey
+                PollForSourceChanges: false
+              RunOrder: 1
+        - 
+          Name: DeployByCLI
+          Actions: 
+            - 
+              Name: DeployByCLI
+              InputArtifacts: 
+                - Name: SourceOutput
+              ActionTypeId: 
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration: 
+                ProjectName: !Ref DeployerAction
+              RunOrder: 1
+      ArtifactStore: 
+        Type: S3
+        Location: !Ref CodePipelineArtifactStoreBucket
+  DeployerAction:
+    Type: AWS::CodeBuild::Project
+    DependsOn: CodeBuildRole
+    Properties:
+      Name: DeployerAction
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:1.0
+      #EnvironmentVariable:
+      #  - Name: AWS_REGION
+      #    Type: PLAINTEXT
+      #    Value: !Ref Region
+      Source:
+        Type: CODEPIPELINE
+      ServiceRole: !Ref CodeBuildRole
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          Effect: Allow
+          Principal:
+            Service:
+              - codebuild.amazonaws.com
+              - ec2.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+  Cloud9InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref CodeBuildRole
+  AmazonCloudWatchEventRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - events.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      Policies:
+        -
+          PolicyName: cwe-pipeline-execution
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              -
+                Effect: Allow
+                Action: '*'
+                Resource: '*'
+  AmazonCloudWatchEventRule:
+    DependsOn: 
+    - DeployArtifact
+    Type: AWS::Events::Rule
+    Properties:
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - 'AWS API Call via CloudTrail'
+        detail:
+          eventSource:
+            - s3.amazonaws.com
+          eventName:
+            - PutObject
+            - CompleteMultipartUpload
+          resources:
+            ARN:
+            - !Join [ '', [ !Ref ArtifactStoreBucket, '/', '*' ] ]
+            #  - !Join [ '', [ !Ref ArtifactStoreBucket, '/', !Ref SourceObjectKey ] ]
+      Targets:
+        -
+          Arn:
+            !Join [ '', [ 'arn:aws:codepipeline:', !Ref 'AWS::Region', ':', !Ref 'AWS::AccountId', ':', !Ref DeployerPipeline ] ]
+          RoleArn: !GetAtt AmazonCloudWatchEventRole.Arn
+          Id: deploypipeline
+  DeployArtifact:
+    DependsOn: 
+    - S3CopyToArtifactBucket
+    Type: Custom::DeployCR
+    Properties:
+      ServiceToken: !GetAtt S3CopyToArtifactBucket.Arn
+    Metadata:
+      Comment: This kicks off cdk artifact deployment to S3 bucket
+  S3CopyToArtifactBucket:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaRole.Arn
+      Runtime: python3.7
+      Timeout: '300'
+      Environment:
+        Variables:
+          URL_SOURCE: !Ref UrlSource
+          TARGET_BUCKET: !Ref ArtifactStoreBucket
+      Code:
+        # S3Bucket: !Ref CodePipelineArtifactStoreBucket
+        # S3Key: !Ref S3CopyKey        
+        ZipFile: |
+          """
+          This lambda uploads object from au URL to a Target Bucket
+          """
+  
+          import cfnresponse
+          import json
+          import boto3
+          import os
+          import urllib
+          # import requests
+  
+          client = boto3.client('s3')
+          url = os.environ['URL_SOURCE']
+          target_bucket = os.environ['TARGET_BUCKET']
+  
+          def send_error(event, error):
+              response_body = json.dumps({
+                  'Status': 'FAILED',
+                  'Reason': str(error),
+                  'PhysicalResourceId': get_physical_resource_id(event),
+                  'StackId': event['StackId'],
+                  'RequestId': event['RequestId'],
+                  'LogicalResourceId': event['LogicalResourceId']
+              })
+              print(response_body)
+          # requests.put(event['ResponseURL'], data=response_body)
+          def lambda_handler(event, context):
+              print(event)
+              s3key = os.path.basename(url)
+              filedata = urllib.request.urlopen(url)
+              try:
+                  client.upload_fileobj(filedata, target_bucket, s3key)
+              except Exception as err:
+                  send_error(event, err)
+              responseData = {}
+              if 'test' in event.keys():
+                return {
+                    'message': "SUCCESS",
+                    'event': event,
+                    'response': responseData
+                }
+              else:
+                cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData, "CustomResourcePhysicalID")
+  LambdaRole:
+    Type: "AWS::IAM::Role"
+    Properties: 
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+      - PolicyName: LambdaPolicy
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            - logs:DescribeLogStreams
+            Resource: "*"
+            # need to scope this down eventually
+          - Effect: Allow
+            Action: "*"
+            Resource: "*"
