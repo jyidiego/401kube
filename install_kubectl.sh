@@ -34,3 +34,6 @@ curl --silent --location "https://github.com/weaveworks/eksctl/releases/download
 
 echo "Installing eksctl..."
 sudo mv /tmp/eksctl /usr/local/bin
+
+echo "Verifying eksctl..."
+eksctl version
